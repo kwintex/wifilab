@@ -1,0 +1,184 @@
+----------------------------------------
+INSTALL HBO-ICT LAB Wi-Fi CAPTIVE PORTAL
+----------------------------------------
+Alles uitvoeren als root tenzij anders aangegeven.
+
+
+* DVD CentOS7-1708
+------------------
+Aanpassingen:
+- Hostname: wifilab.hu.local
+- Automatische partitioning
+- Server with GUI (check Hardware Monitoring Utilities only)
+- root wachtwoord: Pa$$w0rd
+- user: beheerder / is administrator / zelfde ww
+
+
+* Installeer pakketten:
+-----------------------
+yum update
+yum -y install python-flask
+yum -y install epel-release
+yum -y install httpd
+yum -y install mod_proxy_uwsgi 
+yum -y install python-pip
+yum -y install gcc python-pip
+yum -y install python-devl
+pip install --upgrade pip
+pip install uwsgi
+yum -y install mod_wsgi
+#yum -y install psacct gcc python34 python34-devel python34-pip 
+#pip3 install --upgrade pip
+#pip3 install virtualenv flask uwsgi flask_restful
+
+
+* Configure Apache met WSGI:
+----------------------------
+mkdir -p /var/www/rootapp
+chown apache:apache /var/www/rootapp
+
+cat << EOF > /etc/httpd/conf.d/wifilab.conf
+LoadModule proxy_uwsgi_module modules/mod_proxy_uwsgi.so
+<VirtualHost *>
+    ServerName wifilab.hu
+    WSGIDaemonProcess wifilab user=apache group=apache threads=5 home=/var/www/rootapp/
+    WSGIScriptAlias / /var/www/rootapp/wsgi.py
+    <directory /var/www/rootapp>
+        WSGIProcessGroup wifilab
+        WSGIApplicationGroup %{GLOBAL}
+        WSGIScriptReloading On
+        Order deny,allow
+        Allow from all
+    </directory>
+</VirtualHost>
+EOF
+
+chmod 755 /var/log/httpd
+mkdir -p /var/log/httpd/wifilab
+chown apache:apache /var/log/httpd/wifilab
+systemctl start httpd.service 
+systemctl enable httpd.service 
+
+
+* Disable SELinux en virtualisatie (indien nodig):
+--------------------------------------------------
+sed -i 's/^SELINUX=enforcing/SELINUX=disabled/' /etc/sysconfig/selinux
+vi /etc/sysconfig/selinux 
+SELINUX=disabled
+
+systemctl disable libvirtd.service
+
+
+* Configure Networking:
+-----------------------
+ens1: 192.168.3.100/24
+enp36s0: dhcp, voor internet toegang
+
+#Enable forwarding: 
+vi /etc/sysctl.conf
+net.ipv4.ip_forward = 1
+
+
+* DNSMasq voor DNS en DHCP:
+---------------------------
+cp /etc/dnsmasq.conf   /etc/dnsmasq.conf~  
+cat > /etc/dnsmasq.conf
+#LAN-NIC
+interface=ens1
+
+#DNS-SERVER
+listen-address=127.0.0.1 
+listen-address=192.168.3.100
+bind-interfaces
+#server=8,8,8,8
+#server=8.8.4.4
+#add static entries in /etc/hosts if you like
+
+#DHCP-SERVER
+dhcp-range=lan,192.168.3.110,192.168.3.250,12h
+dhcp-option=lan,3,192.168.3.100
+dhcp-option=lan,6,192.168.3.100
+
+systemctl start dnsmasq.service 
+systemctl enable dnsmasq.service 
+# tail /var/lib/dnsmasq/dnsmasq.leases
+
+
+* Firewalling:
+--------------
+firewall-cmd --permanent --change-interface=enp36s0 --zone=external
+firewall-cmd --set-default-zone=internal
+firewall-cmd --permanent --remove-masquerade --zone=external
+firewall-cmd --permanent --add-service=http
+firewall-cmd --permanent --add-service=dns
+firewall-cmd --permanent --remove-service=mdns
+firewall-cmd --permanent --remove-service=samba-client
+firewall-cmd --permanent --remove-service=dhcpv6-client
+
+# alleen als de server ook dhcp server moet zijn:
+firewall-cmd --permanent --add-service=dhcp
+firewall-cmd --reload
+
+# check
+firewall-cmd --list-services
+
+# rules specifiek voor captive portal
+# RESULTAAT: Iedereen in het LAN wordt naar 192.168.3.100 geleid, mits connect op port 80. Verder kan men niets meer (tcp/udp)
+firewall-cmd --permanent --direct --passthrough ipv4 -I PREROUTING -t mangle -i ens1 -m mark --mark 0 -j MARK --set-mark 1
+firewall-cmd --permanent --direct --passthrough ipv4 -I PREROUTING -t nat -i ens1 -p tcp -m mark --mark 1 -m tcp --dport 80 -j DNAT --to-destination 192.168.3.100
+firewall-cmd --permanent --direct --passthrough ipv4 -I FORWARD -m mark --mark 1 -j DROP
+firewall-cmd --permanent --direct --passthrough ipv4 -I POSTROUTING -t nat -o enp36s0 -m mark --mark 2 -j MASQUERADE
+
+# RESULTAAT: bepaalde Mac-adressen uit het lan mogen poort 80/443 en kunnen dns queries doen op bv 8.8.8.8
+firewall-cmd --permanent --direct --passthrough ipv4 -I FORWARD -m mark --mark 2 -p tcp --dport 80 -j ACCEPT
+firewall-cmd --permanent --direct --passthrough ipv4 -I FORWARD -m mark --mark 2 -p tcp --dport 443 -j ACCEPT
+firewall-cmd --permanent --direct --passthrough ipv4 -I FORWARD -m mark --mark 2 -p udp --dport 53 -j ACCEPT
+
+# Evt. firewall na internet voor clients verder openzetten:
+firewall-cmd --permanent --direct --passthrough ipv4 -I FORWARD -m mark --mark 2 -p tcp --dport 25 -j ACCEPT
+firewall-cmd --permanent --direct --passthrough ipv4 -I FORWARD -m mark --mark 2 -p tcp --dport 110 -j ACCEPT
+firewall-cmd --permanent --direct --passthrough ipv4 -I FORWARD -m mark --mark 2 -p tcp --dport 993 -j ACCEPT
+firewall-cmd --permanent --direct --passthrough ipv4 -I FORWARD -m mark --mark 2 -p tcp --dport 995 -j ACCEPT
+firewall-cmd --permanent --direct --passthrough ipv4 -I FORWARD -m mark --mark 2 -p tcp --dport 3306 -j ACCEPT
+firewall-cmd --permanent --direct --passthrough ipv4 -I FORWARD -m mark --mark 2 -p udp --dport 123 -j ACCEPT
+firewall-cmd --reload
+
+# test "een" client
+#   firewall-cmd --permanent --direct --passthrough ipv4 -I PREROUTING -t mangle -m mac --mac-source 00:0c:29:12:d0:c3 -j MARK --set-mark 2
+#   firewall-cmd --reload
+# remove deze client (-D) rule
+#   firewall-cmd --permanent --direct --passthrough ipv4 -D PREROUTING -t mangle -m mac --mac-source 00:0c:29:12:d0:c3 -j MARK --set-mark 2
+#   firewall-cmd --reload
+
+
+* vanaf client: SCP alle data naar de linux host
+------------------------------------------------
+win> bash
+cd /mnt/d/HU/labcommissie/wireless_lab/PyCharm-WirelessLab/
+scp * root@192.168.3.100/var/www/rootapp /
+
+
+* Configure Sudo (Flask-->shell-->IPtables):
+--------------------------------------------
+
+chown root:root /var/www/rootapp/bin/add_mac_to_iptables.sh
+chmod 700 /var/www/rootapp/bin/add_mac_to_iptables.sh
+
+visudo; # add line:
+apache  ALL=(ALL) NOPASSWD: /var/www/rootapp/bin/add_mac_to_iptables.sh
+
+
+* Configure Crontab (Daily Maintenance Script):
+-----------------------------------------------
+
+#Script should run every day using crontab with root capabilities:
+cat << EOF >  /etc/cron.daily/iptable_maintenance
+#!/bin/sh
+/bin/sh /var/www/rootapp/bin/reports.sh
+/usr/bin/python /var/www/rootapp/bin/iptables_maintenance.py
+EOF
+
+chmod 755 /var/www/rootapp/bin/iptables_maintenance.py
+chown root:root /var/www/rootapp/bin/iptables_maintenance.py
+
+

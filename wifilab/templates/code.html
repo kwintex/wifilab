@@ -1,0 +1,19 @@
+{% extends "layout.html" %}
+{% block body %}
+
+Er is een e-mail naar je verzonden met daarin een code.<br>
+Vul deze code hieronder in om het MAC-adres {{mac}} toegang te geven tot dit Wi-Fi netwerk.<br><br>
+
+<form action="/result/" method="post">
+    Code uit de e-mail:<br>
+    <input type="password" name="secret"><br><br>
+
+    MAC-adres van je device:<br>
+    <input type="text" name="mac_address" value="{{mac}}"><br><br>
+
+    <div class="myButton">
+        <input type="submit" value="">
+    </div>
+</form>
+
+{% endblock %}

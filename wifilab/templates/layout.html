@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:gebruik="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <title>HBO-ICT Labvoorzieningen | Wi-Fi</title>
+
+    <!--
+    TODO
+    <link rel="shortcut icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
+    -->
+    <script src="../static/js/lab_form_helper.js"></script>
+    <link rel="stylesheet" type="text/css" href="../static/css/default.css">
+    <link rel="icon" href="../static/img/favicon.ico?" type="image/x-icon" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+</head>
+<body>
+
+<img src="../static/img/banner.png" height="108" width="587" >
+
+<br>
+<ul>
+  <li><a class="active" href="/">HOME</a></li>
+</ul>
+
+<div class="grey_body">
+{% block body %}{% endblock %}
+</div>
+
+<div class="footer">
+    © 2018 - Kwintex
+</div>
+
+</body>
+</html>

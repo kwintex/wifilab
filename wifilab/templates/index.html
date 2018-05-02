@@ -1,0 +1,31 @@
+{% extends "layout.html" %}
+{% block body %}
+
+<form name="request_code" action="/code/" onsubmit="return validateForm()" method="post">
+    Jouw HU-email adres:<br>
+    <input type="email" name="hu_email" id="huMail" onfocusout="processMailAddress()"><br><br>
+
+    Het MAC adres waarvoor je toegang vraagt:<br>
+    (bv B8-8A-60-D1-A0-42):<br>
+    <input type="text" name="mac_address" id="macAddress" maxlength="17" value="{{mac}}" onfocusout="processMacAddress()"><br><br>
+
+    Type / Naam device:<br>
+    (bv 'Raspberry Pi 3B+ Jan Jansen')<br>
+    <input type="text" name="type_name" maxlength="32"><br><br>
+
+    Gewenste toegangsperiode:<br>
+    <select name="expiration" id="expiration">
+      <option value="92">3 Maanden</option>
+    </select>
+    <br><br>
+
+    <input type="checkbox" name="accept_conditions">
+    Ik accepteer de <a href="../static/pdf/use_policy.pdf" target="_blank">voorwaarden</a> voor het gebruik:<br><br>
+
+    <div class="myButton">
+        <input type="submit" value="">
+    </div>
+
+</form>
+
+{% endblock %}

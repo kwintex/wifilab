@@ -1,0 +1,13 @@
+{% extends "layout.html" %}
+{% block body %}
+
+<br>
+Gelukt. Je hebt toegang gekregen tot het Wi-Fi netwerk voor:<br>
+<table>
+    <tr><td>Device: </td><td><b>{{device}}</b></td></tr>
+    <tr><td>MAC-adres: </td><td><b>{{mac}}</b></td></tr>
+</table>
+<br>Na de expiratiedatum van: "<b>{{expire}}</b>", kun je opnieuw toegang vragen.<br><br>
+
+{% endblock %}
+
